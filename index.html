@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Event Reminders</title>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F7F5F0;
+    --surface: #FFFFFF;
+    --surface2: #F0EDE6;
+    --border: rgba(0,0,0,0.1);
+    --border-med: rgba(0,0,0,0.2);
+    --text: #1C1917;
+    --text-muted: #78716C;
+    --accent: #7C5CBF;
+    --accent-light: #EDE9F8;
+    --accent-dark: #5B3FA3;
+    --red: #DC2626;
+    --red-light: #FEF2F2;
+    --amber: #D97706;
+    --amber-light: #FFFBEB;
+    --green: #16A34A;
+    --green-light: #F0FDF4;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* LAYOUT */
+  .shell { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 2rem 0;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+  }
+
+  .logo {
+    padding: 0 1.5rem 2rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.5rem;
+  }
+  .logo-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px;
+    letter-spacing: -0.3px;
+    color: var(--text);
+  }
+  .logo-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-weight: 300;
+  }
+
+  .nav { flex: 1; padding: 0 0.75rem; }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-muted);
+    font-weight: 400;
+    transition: all 0.15s;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+  .nav-count {
+    margin-left: auto;
+    background: var(--accent-light);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 999px;
+  }
+
+  .main { margin-left: 240px; flex: 1; padding: 2.5rem 2rem; max-width: 900px; }
+
+  /* PAGE HEADERS */
+  .page-header { margin-bottom: 2rem; }
+  .page-title { font-family: 'DM Serif Display', serif; font-size: 30px; letter-spacing: -0.5px; }
+  .page-sub { color: var(--text-muted); font-size: 14px; margin-top: 4px; font-weight: 300; }
+
+  /* CARDS */
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  /* EVENT CARDS */
+  .event-grid { display: flex; flex-direction: column; gap: 10px; }
+  .event-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .event-card:hover { border-color: var(--border-med); box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+
+  .event-icon {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .icon-birthday { background: #EDE9F8; }
+  .icon-anniversary { background: #FDE8F0; }
+  .icon-holiday { background: #DCFCE7; }
+  .icon-other { background: #E0F2FE; }
+
+  .event-body { flex: 1; min-width: 0; }
+  .event-name { font-weight: 500; font-size: 15px; }
+  .event-meta { font-size: 13px; color: var(--text-muted); margin-top: 2px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .event-notes { font-size: 13px; color: var(--text-muted); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); font-weight: 300; }
+
+  .event-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+  /* BADGES */
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+  }
+  .badge-urgent { background: var(--red-light); color: var(--red); }
+  .badge-soon { background: var(--amber-light); color: var(--amber); }
+  .badge-ok { background: var(--green-light); color: var(--green); }
+
+  /* BUTTONS */
+  .btn {
+    padding: 8px 18px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-med);
+    background: transparent;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--surface2); }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
+  .btn-danger { color: var(--red); border-color: #FECACA; }
+  .btn-danger:hover { background: var(--red-light); }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+  /* FORMS */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } .sidebar { display: none; } .main { margin-left: 0; } }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group-full { grid-column: 1 / -1; }
+  label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+  input, select, textarea {
+    width: 100%;
+    padding: 9px 13px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-med);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 400;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,92,191,0.1);
+  }
+  textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
+
+  /* STATUS */
+  .status-msg {
+    font-size: 13px;
+    padding: 9px 14px;
+    border-radius: var(--radius-sm);
+    margin-top: 10px;
+    font-weight: 400;
+  }
+  .status-success { background: var(--green-light); color: var(--green); }
+  .status-error { background: var(--red-light); color: var(--red); }
+  .status-info { background: var(--accent-light); color: var(--accent); }
+
+  /* SETTINGS */
+  .settings-label { font-size: 13px; color: var(--text-muted); font-weight: 500; margin-bottom: 6px; display: block; }
+  .settings-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; font-weight: 300; }
+  .settings-hint a { color: var(--accent); text-decoration: none; }
+  .settings-row { margin-bottom: 1.1rem; }
+  .settings-section-title { font-family: 'DM Serif Display', serif; font-size: 18px; margin-bottom: 0.75rem; }
+  .divider { height: 1px; background: var(--border); margin: 1.75rem 0; }
+
+  /* EMPTY */
+  .empty {
+    text-align: center;
+    padding: 4rem 1rem;
+    color: var(--text-muted);
+  }
+  .empty-icon { font-size: 36px; margin-bottom: 12px; }
+  .empty-title { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--text); margin-bottom: 6px; }
+  .empty-sub { font-size: 14px; font-weight: 300; }
+
+  /* STAT CARDS */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1.75rem; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; }
+  .stat-label { font-size: 12px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-value { font-family: 'DM Serif Display', serif; font-size: 28px; margin-top: 2px; }
+
+  code {
+    background: var(--surface2);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: monospace;
+  }
+
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 1rem; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="logo">
+      <div class="logo-title">Remindly</div>
+      <div class="logo-sub">Never forget what matters</div>
+    </div>
+    <div class="nav">
+      <button class="nav-item active" onclick="showTab('events')" id="nav-events">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        All events
+        <span class="nav-count" id="nav-count">0</span>
+      </button>
+      <button class="nav-item" onclick="showTab('add')" id="nav-add">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Add event
+      </button>
+      <button class="nav-item" onclick="showTab('settings')" id="nav-settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </button>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- EVENTS TAB -->
+    <div id="tab-events">
+      <div class="page-header">
+        <div class="page-title">Your events</div>
+        <div class="page-sub">Upcoming birthdays, anniversaries & more</div>
+      </div>
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-label">Total</div>
+          <div class="stat-value" id="stat-total">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">This month</div>
+          <div class="stat-value" id="stat-month">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Coming soon</div>
+          <div class="stat-value" id="stat-soon">0</div>
+        </div>
+      </div>
+      <div id="event-list"></div>
+    </div>
+
+    <!-- ADD TAB -->
+    <div id="tab-add" style="display:none;">
+      <div class="page-header">
+        <div class="page-title" id="add-title">Add an event</div>
+        <div class="page-sub">Fill in the details and we'll remind you before it arrives</div>
+      </div>
+      <div class="card">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Event name</label>
+            <input type="text" id="f-name" placeholder="e.g. Mom's Birthday">
+          </div>
+          <div class="form-group">
+            <label>Event type</label>
+            <select id="f-type">
+              <option value="birthday">🎂 Birthday</option>
+              <option value="anniversary">💑 Anniversary</option>
+              <option value="holiday">🎉 Holiday</option>
+              <option value="other">📅 Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="f-date">
+          </div>
+          <div class="form-group">
+            <label>Person / relationship</label>
+            <input type="text" id="f-person" placeholder="e.g. My mother">
+          </div>
+          <div class="form-group form-group-full">
+            <label>Gift ideas & notes</label>
+            <textarea id="f-notes" placeholder="e.g. She loves gardening, prefers experiences over things, budget around $50. Last year I got her a book."></textarea>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="saveEvent()">Save event</button>
+          <button class="btn" onclick="showTab('events')">Cancel</button>
+        </div>
+        <div id="add-status"></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS TAB -->
+    <div id="tab-settings" style="display:none;">
+      <div class="page-header">
+        <div class="page-title">Settings</div>
+        <div class="page-sub">Configure email reminders via EmailJS</div>
+      </div>
+
+      <div class="card">
+        <div class="settings-section-title">Email setup</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:1.25rem;font-weight:300;line-height:1.7;">
+          This app uses <strong style="font-weight:500;">EmailJS</strong> to send reminders — free for up to 200 emails/month, no backend needed.
+          <a href="https://www.emailjs.com" target="_blank" style="color:var(--accent);">Sign up at emailjs.com →</a>
+        </p>
+
+        <div class="settings-row">
+          <label class="settings-label">Your email address</label>
+          <input type="email" id="s-email" placeholder="you@example.com">
+          <div class="settings-hint">Reminders will be sent here</div>
+        </div>
+        <div class="settings-row">
+          <label class="settings-label">EmailJS Public Key</label>
+          <input type="text" id="s-pubkey" placeholder="e.g. user_xxxxxxxxxxxx">
+          <div class="settings-hint">Account → General → Public Key in your EmailJS dashboard</div>
+        </div>
+        <div class="settings-row">
+          <label class="settings-label">EmailJS Service ID</label>
+          <input type="text" id="s-serviceid" placeholder="e.g. service_xxxxxxx">
+          <div class="settings-hint">Email Services section in your EmailJS dashboard</div>
+        </div>
+        <div class="settings-row">
+          <label class="settings-label">EmailJS Template ID</label>
+          <input type="text" id="s-templateid" placeholder="e.g. template_xxxxxxx">
+          <div class="settings-hint">Email Templates section — use variables: <code>{{to_email}}</code> <code>{{subject}}</code> <code>{{message}}</code></div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
+          <button class="btn" onclick="testEmail()">Send test email</button>
+        </div>
+        <div id="settings-status"></div>
+
+        <div class="divider"></div>
+
+        <div class="settings-section-title">EmailJS template guide</div>
+        <p style="font-size:13px;color:var(--text-muted);line-height:1.9;font-weight:300;">
+          In your EmailJS template editor, set:<br>
+          • <strong style="font-weight:500;">To Email:</strong> <code>{{to_email}}</code><br>
+          • <strong style="font-weight:500;">Subject:</strong> <code>{{subject}}</code><br>
+          • <strong style="font-weight:500;">Body:</strong> <code>{{message}}</code> (enable HTML content)<br><br>
+          That's it — the app fills in all values automatically when sending reminders.
+        </p>
+
+        <div class="divider"></div>
+
+        <div class="settings-section-title">Send reminders now</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:1rem;font-weight:300;line-height:1.7;">
+          Click below each day to check for events that are exactly 7 days or 1 day away and send reminders. Each reminder is only sent once per day.
+        </p>
+        <button class="btn btn-primary" onclick="checkAndSendReminders()">Check &amp; send reminders</button>
+        <div id="check-status"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const EVENTS_KEY = 'remindly_events';
+const SETTINGS_KEY = 'remindly_settings';
+let events = [];
+let settings = { email:'', pubkey:'', serviceid:'', templateid:'' };
+let editingId = null;
+
+const typeEmoji = { birthday:'🎂', anniversary:'💑', holiday:'🎉', other:'📅' };
+
+function loadData() {
+  try { events = JSON.parse(localStorage.getItem(EVENTS_KEY) || '[]'); } catch(e) { events=[]; }
+  try { settings = { ...settings, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch(e) {}
+  populateSettings();
+  renderEvents();
+}
+
+function saveEventsLocal() { localStorage.setItem(EVENTS_KEY, JSON.stringify(events)); }
+
+function showTab(tab) {
+  ['events','add','settings'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t===tab ? 'block' : 'none';
+    const nav = document.getElementById('nav-'+t);
+    if (nav) nav.classList.toggle('active', t===tab);
+  });
+  if (tab === 'add' && !editingId) {
+    clearForm();
+    document.getElementById('add-title').textContent = 'Add an event';
+  }
+}
+
+function clearForm() {
+  ['f-name','f-date','f-person','f-notes'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-type').value = 'birthday';
+  editingId = null;
+}
+
+function getDaysUntil(dateStr) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const d = new Date(dateStr + 'T00:00:00');
+  const next = new Date(today.getFullYear(), d.getMonth(), d.getDate());
+  if (next < today) next.setFullYear(today.getFullYear()+1);
+  return Math.round((next - today) / 86400000);
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+}
+
+function renderEvents() {
+  const container = document.getElementById('event-list');
+  const count = events.length;
+  document.getElementById('nav-count').textContent = count;
+  document.getElementById('stat-total').textContent = count;
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const monthEvents = events.filter(e => {
+    const d = new Date(e.date + 'T00:00:00');
+    return d.getMonth() === today.getMonth();
+  });
+  document.getElementById('stat-month').textContent = monthEvents.length;
+  const soonEvents = events.filter(e => getDaysUntil(e.date) <= 14);
+  document.getElementById('stat-soon').textContent = soonEvents.length;
+
+  if (!count) {
+    container.innerHTML = `<div class="empty">
+      <div class="empty-icon">📅</div>
+      <div class="empty-title">No events yet</div>
+      <div class="empty-sub">Add a birthday, anniversary or any special date to get started.</div>
+    </div>`;
+    return;
+  }
+
+  const sorted = [...events].sort((a,b) => getDaysUntil(a.date) - getDaysUntil(b.date));
+  container.innerHTML = '<div class="event-grid">' + sorted.map(ev => {
+    const days = getDaysUntil(ev.date);
+    let badgeClass = 'badge-ok';
+    let badgeLabel = days === 0 ? 'Today!' : days === 1 ? 'Tomorrow' : `${days} days away`;
+    if (days <= 1) badgeClass = 'badge-urgent';
+    else if (days <= 7) badgeClass = 'badge-soon';
+    return `<div class="event-card">
+      <div class="event-icon icon-${ev.type}">${typeEmoji[ev.type]||'📅'}</div>
+      <div class="event-body">
+        <div class="event-name">${ev.name}</div>
+        <div class="event-meta">
+          <span>${formatDate(ev.date)}</span>
+          ${ev.person ? `<span style="opacity:0.6;">·</span><span>${ev.person}</span>` : ''}
+          <span class="badge ${badgeClass}">${badgeLabel}</span>
+        </div>
+        ${ev.notes ? `<div class="event-notes">${ev.notes}</div>` : ''}
+      </div>
+      <div class="event-actions">
+        <button class="btn btn-sm" onclick="editEvent('${ev.id}')">Edit</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteEvent('${ev.id}')">Delete</button>
+      </div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+function saveEvent() {
+  const name = document.getElementById('f-name').value.trim();
+  const date = document.getElementById('f-date').value;
+  if (!name || !date) { showStatus('add-status','Please fill in the event name and date.','error'); return; }
+  const ev = {
+    id: editingId || Date.now().toString(),
+    name, date,
+    type: document.getElementById('f-type').value,
+    person: document.getElementById('f-person').value.trim(),
+    notes: document.getElementById('f-notes').value.trim(),
+    remindersSent: editingId ? (events.find(e=>e.id===editingId)?.remindersSent||{}) : {}
+  };
+  if (editingId) {
+    events = events.map(e => e.id===editingId ? ev : e);
+    editingId = null;
+  } else {
+    events.push(ev);
+  }
+  saveEventsLocal();
+  renderEvents();
+  showTab('events');
+}
+
+function editEvent(id) {
+  const ev = events.find(e=>e.id===id);
+  if (!ev) return;
+  editingId = id;
+  document.getElementById('f-name').value = ev.name;
+  document.getElementById('f-date').value = ev.date;
+  document.getElementById('f-type').value = ev.type;
+  document.getElementById('f-person').value = ev.person||'';
+  document.getElementById('f-notes').value = ev.notes||'';
+  document.getElementById('add-title').textContent = 'Edit event';
+  showTab('add');
+}
+
+function deleteEvent(id) {
+  if (!confirm('Delete this event?')) return;
+  events = events.filter(e=>e.id!==id);
+  saveEventsLocal();
+  renderEvents();
+}
+
+function saveSettings() {
+  settings.email = document.getElementById('s-email').value.trim();
+  settings.pubkey = document.getElementById('s-pubkey').value.trim();
+  settings.serviceid = document.getElementById('s-serviceid').value.trim();
+  settings.templateid = document.getElementById('s-templateid').value.trim();
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  showStatus('settings-status','Settings saved!','success');
+}
+
+function populateSettings() {
+  document.getElementById('s-email').value = settings.email||'';
+  document.getElementById('s-pubkey').value = settings.pubkey||'';
+  document.getElementById('s-serviceid').value = settings.serviceid||'';
+  document.getElementById('s-templateid').value = settings.templateid||'';
+}
+
+async function generateGiftIdeas(event) {
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 700,
+        messages: [{
+          role: 'user',
+          content: `You are a thoughtful gift advisor. Suggest 4 specific gift ideas based on this event. Format as HTML list items: bold the gift name, add a 1-sentence description, then a clickable Amazon search link (https://www.amazon.com/s?k=search+terms). Keep it warm and helpful.
+
+Event: ${event.name}
+Type: ${event.type}
+Person: ${event.person||'not specified'}
+Notes: ${event.notes||'none'}
+
+Return ONLY the <li> elements, nothing else.`
+        }]
+      })
+    });
+    const data = await resp.json();
+    return data.content?.find(b=>b.type==='text')?.text || '<li>Visit Amazon or Etsy for personalised gift ideas!</li>';
+  } catch(e) {
+    return '<li>Check Amazon, Etsy or Not on the High Street for great gift ideas!</li>';
+  }
+}
+
+async function sendReminderEmail(event, daysAway) {
+  if (!settings.pubkey||!settings.serviceid||!settings.templateid||!settings.email) {
+    return { ok:false, msg:'Email settings not configured. Please complete the Settings tab.' };
+  }
+  emailjs.init(settings.pubkey);
+  const giftIdeas = await generateGiftIdeas(event);
+  const subject = daysAway===7 ? `Reminder: ${event.name} is in 7 days!` : `Tomorrow: ${event.name}!`;
+  const accentColor = '#7C5CBF';
+  const message = `<div style="font-family:'DM Sans',sans-serif;max-width:580px;margin:0 auto;background:#fff;padding:32px;border-radius:12px;">
+  <h2 style="font-family:Georgia,serif;color:${accentColor};margin:0 0 8px;">${daysAway===7?'7-day reminder':'One day to go!'}</h2>
+  <h3 style="font-weight:400;color:#1C1917;margin:0 0 20px;font-size:20px;">${event.name}</h3>
+  <p style="color:#78716C;font-size:14px;margin:0 0 6px;">📅 <strong style="color:#1C1917;">${formatDate(event.date)}</strong>${event.person?' · '+event.person:''}</p>
+  ${event.notes?`<div style="background:#F7F5F0;border-left:3px solid ${accentColor};padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;font-size:13px;color:#78716C;"><strong style="color:#1C1917;">Your notes:</strong><br>${event.notes}</div>`:''}
+  <h4 style="color:${accentColor};margin:24px 0 12px;font-size:15px;">Gift ideas</h4>
+  <ul style="padding-left:20px;color:#1C1917;font-size:14px;line-height:2;">${giftIdeas}</ul>
+  <p style="color:#A8A29E;font-size:11px;margin-top:32px;border-top:1px solid #F0EDE6;padding-top:16px;">Sent by Remindly · your personal event reminder app</p>
+</div>`;
+
+  try {
+    await emailjs.send(settings.serviceid, settings.templateid, { to_email:settings.email, subject, message });
+    return { ok:true };
+  } catch(e) {
+    return { ok:false, msg: e.text||e.message||'Failed to send. Check your EmailJS credentials.' };
+  }
+}
+
+async function checkAndSendReminders() {
+  const statusEl = document.getElementById('check-status');
+  statusEl.innerHTML = '<div class="status-msg status-info">Checking your events...</div>';
+  if (!settings.email||!settings.pubkey) {
+    statusEl.innerHTML = '<div class="status-msg status-error">Please configure and save your email settings first.</div>';
+    return;
+  }
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayKey = today.toISOString().split('T')[0];
+  let sent=0, alreadySent=0;
+
+  for (const ev of events) {
+    const days = getDaysUntil(ev.date);
+    for (const trigger of [7,1]) {
+      if (days === trigger) {
+        const key = `${trigger}_${todayKey}`;
+        if (ev.remindersSent?.[key]) { alreadySent++; continue; }
+        statusEl.innerHTML = `<div class="status-msg status-info">Generating gift ideas and sending reminder for ${ev.name}...</div>`;
+        const result = await sendReminderEmail(ev, trigger);
+        if (result.ok) {
+          ev.remindersSent = { ...(ev.remindersSent||{}), [key]:true };
+          sent++;
+        } else {
+          statusEl.innerHTML = `<div class="status-msg status-error">Could not send reminder for ${ev.name}: ${result.msg}</div>`;
+          saveEventsLocal(); return;
+        }
+      }
+    }
+  }
+  saveEventsLocal();
+  if (sent > 0) {
+    statusEl.innerHTML = `<div class="status-msg status-success">Sent ${sent} reminder${sent>1?'s':''}! Check your inbox.</div>`;
+  } else if (alreadySent > 0) {
+    statusEl.innerHTML = `<div class="status-msg status-info">Today's reminders were already sent earlier.</div>`;
+  } else {
+    statusEl.innerHTML = `<div class="status-msg status-info">No reminders due today. Come back closer to your events!</div>`;
+  }
+}
+
+async function testEmail() {
+  saveSettings();
+  if (!settings.email||!settings.pubkey||!settings.serviceid||!settings.templateid) {
+    showStatus('settings-status','Please fill in all four fields before testing.','error'); return;
+  }
+  showStatus('settings-status','Sending test email...','info');
+  emailjs.init(settings.pubkey);
+  try {
+    await emailjs.send(settings.serviceid, settings.templateid, {
+      to_email: settings.email,
+      subject: 'Remindly — test email',
+      message: '<div style="font-family:sans-serif;padding:24px;"><h2 style="color:#7C5CBF;">It works!</h2><p style="color:#78716C;">Your Remindly app is set up correctly. You will receive reminder emails 7 days and 1 day before your events.</p></div>'
+    });
+    showStatus('settings-status','Test email sent! Check your inbox.','success');
+  } catch(e) {
+    showStatus('settings-status','Failed: '+(e.text||e.message||'Check your EmailJS credentials.'),'error');
+  }
+}
+
+function showStatus(id, msg, type) {
+  const el = document.getElementById(id);
+  const cls = type==='success'?'status-success':type==='error'?'status-error':'status-info';
+  el.innerHTML = `<div class="status-msg ${cls}">${msg}</div>`;
+  setTimeout(()=>{ if(el) el.innerHTML=''; }, 6000);
+}
+
+loadData();
+</script>
+</body>
+</html>
