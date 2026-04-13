@@ -584,26 +584,31 @@ async function generateGiftIdeas(event) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 700,
+        max_tokens: 800,
         messages: [{
           role: 'user',
-          content: `You are a thoughtful gift advisor. Suggest 4 specific gift ideas based on this event. Format as plain text bullet points (using a dash -). Each on its own line with: gift name, a short description, and an Amazon search URL (https://www.amazon.com/s?k=search+terms). Keep it warm and concise.
+          content: `You are a thoughtful gift advisor. Suggest exactly 3 specific gift ideas based on the notes. For each gift use this format on its own line:
+- GIFT NAME: one sentence description. Shop here: https://www.amazon.com/s?k=very+specific+search+terms
+
+Make the Amazon search terms very specific to the notes provided. Keep it warm.
 
 Event: ${event.name}
 Type: ${event.type}
 Person: ${event.person||'not specified'}
-Notes: ${event.notes||'none'}
+Notes/interests: ${event.notes||'none provided'}
 
-Return ONLY the bullet points, no intro text.`
+Return ONLY the 3 lines. No intro or outro.`
         }]
       })
     });
     const data = await resp.json();
-    return data.content?.find(b=>b.type==='text')?.text || '- Check Amazon or Etsy for great personalised gift ideas!';
+    return data.content?.find(b=>b.type==='text')?.text || '- Check Amazon or Etsy for personalised gift ideas: https://www.amazon.com';
   } catch(e) {
-    return '- Check Amazon or Etsy for great personalised gift ideas!';
+    return '- Check Amazon or Etsy for personalised gift ideas: https://www.amazon.com';
   }
 }
+
+const typeLabel = { birthday: 'Birthday', anniversary: 'Anniversary', holiday: 'Holiday', other: 'Event' };
 
 async function sendReminderEmail(event, daysAway) {
   if (!settings.pubkey||!settings.serviceid||!settings.templateid||!settings.email) {
@@ -611,20 +616,23 @@ async function sendReminderEmail(event, daysAway) {
   }
   emailjs.init(settings.pubkey);
   const giftIdeas = await generateGiftIdeas(event);
-  const subject = daysAway===7 ? `Reminder: ${event.name} is in 7 days!` : `Tomorrow: ${event.name}!`;
+  const evType = typeLabel[event.type] || 'Event';
+  const subject = daysAway===7
+    ? `${evType} Reminder: ${event.name} is in 7 days!`
+    : `${evType} Tomorrow: ${event.name}!`;
 
-  const message = `${daysAway===7 ? '🗓️ 7-DAY REMINDER' : '⏰ TOMORROW!'}: ${event.name}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const message = `${daysAway===7 ? '7-DAY REMINDER' : 'TOMORROW!'}: ${event.name} (${evType})
+----------------------------
 
-📅 Date: ${formatDate(event.date)}${event.person ? '\n👤 For: ' + event.person : ''}
-${event.notes ? '\n📝 Your notes:\n' + event.notes : ''}
+Date: ${formatDate(event.date)}${event.person ? '\nFor: ' + event.person : ''}
+${event.notes ? '\nYour notes:\n' + event.notes : ''}
 
-🎁 GIFT IDEAS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GIFT IDEAS
+----------------------------
 ${giftIdeas}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Sent by Remindly · your personal event reminder app`;
+----------------------------
+Sent by Remindly - your personal event reminder app`;
 
   try {
     await emailjs.send(settings.serviceid, settings.templateid, { to_email:settings.email, subject, message });
