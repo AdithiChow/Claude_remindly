@@ -578,6 +578,13 @@ function populateSettings() {
 }
 
 async function generateGiftIdeas(event) {
+  const notes = event.notes || event.type;
+  const person = event.person || 'someone special';
+
+  // Generate 3 specific Amazon search links based on notes
+  const keywords = notes.toLowerCase().split(/[,\s]+/).filter(w => w.length > 3).slice(0, 3);
+  const baseNote = notes.trim();
+
   try {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -587,24 +594,36 @@ async function generateGiftIdeas(event) {
         max_tokens: 800,
         messages: [{
           role: 'user',
-          content: `You are a thoughtful gift advisor. Suggest exactly 3 specific gift ideas based on the notes. For each gift use this format on its own line:
-- GIFT NAME: one sentence description. Shop here: https://www.amazon.com/s?k=very+specific+search+terms
+          content: `You are a gift advisor. Based on the notes, generate exactly 3 gift ideas. For each, create a specific Amazon search URL with relevant keywords.
 
-Make the Amazon search terms very specific to the notes provided. Keep it warm.
+Format each line EXACTLY like this (no deviations):
+- GIFT NAME: Brief description. https://www.amazon.com/s?k=specific+keywords+here
 
-Event: ${event.name}
-Type: ${event.type}
-Person: ${event.person||'not specified'}
-Notes/interests: ${event.notes||'none provided'}
+Rules:
+- The Amazon URL must have real specific search keywords (e.g. for "chocolates" use k=luxury+chocolate+gift+box+assorted)
+- Each idea on its own line starting with "- "
+- No intro text, no outro text
 
-Return ONLY the 3 lines. No intro or outro.`
+Event type: ${event.type}
+Person: ${person}
+Notes/interests: ${baseNote}
+
+3 gift ideas:`
         }]
       })
     });
     const data = await resp.json();
-    return data.content?.find(b=>b.type==='text')?.text || '- Check Amazon or Etsy for personalised gift ideas: https://www.amazon.com';
+    const text = data.content?.find(b=>b.type==='text')?.text;
+    if (text && text.includes('amazon.com/s?k=')) return text;
+    throw new Error('no valid response');
   } catch(e) {
-    return '- Check Amazon or Etsy for personalised gift ideas: https://www.amazon.com';
+    // Fallback: build Amazon links directly from notes keywords
+    const term1 = encodeURIComponent(baseNote + ' gift');
+    const term2 = encodeURIComponent(baseNote + ' gift box');
+    const term3 = encodeURIComponent(baseNote + ' gift set');
+    return `- ${baseNote.toUpperCase()} GIFT: A personalised ${baseNote} gift they will love. https://www.amazon.com/s?k=${term1}
+- ${baseNote.toUpperCase()} GIFT BOX: A curated gift box perfect for ${person}. https://www.amazon.com/s?k=${term2}
+- ${baseNote.toUpperCase()} GIFT SET: A premium gift set for any occasion. https://www.amazon.com/s?k=${term3}`;
   }
 }
 
