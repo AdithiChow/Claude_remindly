@@ -587,21 +587,21 @@ async function generateGiftIdeas(event) {
         max_tokens: 700,
         messages: [{
           role: 'user',
-          content: `You are a thoughtful gift advisor. Suggest 4 specific gift ideas based on this event. Format as HTML list items: bold the gift name, add a 1-sentence description, then a clickable Amazon search link (https://www.amazon.com/s?k=search+terms). Keep it warm and helpful.
+          content: `You are a thoughtful gift advisor. Suggest 4 specific gift ideas based on this event. Format as plain text bullet points (using a dash -). Each on its own line with: gift name, a short description, and an Amazon search URL (https://www.amazon.com/s?k=search+terms). Keep it warm and concise.
 
 Event: ${event.name}
 Type: ${event.type}
 Person: ${event.person||'not specified'}
 Notes: ${event.notes||'none'}
 
-Return ONLY the <li> elements, nothing else.`
+Return ONLY the bullet points, no intro text.`
         }]
       })
     });
     const data = await resp.json();
-    return data.content?.find(b=>b.type==='text')?.text || '<li>Visit Amazon or Etsy for personalised gift ideas!</li>';
+    return data.content?.find(b=>b.type==='text')?.text || '- Check Amazon or Etsy for great personalised gift ideas!';
   } catch(e) {
-    return '<li>Check Amazon, Etsy or Not on the High Street for great gift ideas!</li>';
+    return '- Check Amazon or Etsy for great personalised gift ideas!';
   }
 }
 
@@ -612,16 +612,19 @@ async function sendReminderEmail(event, daysAway) {
   emailjs.init(settings.pubkey);
   const giftIdeas = await generateGiftIdeas(event);
   const subject = daysAway===7 ? `Reminder: ${event.name} is in 7 days!` : `Tomorrow: ${event.name}!`;
-  const accentColor = '#7C5CBF';
-  const message = `<div style="font-family:'DM Sans',sans-serif;max-width:580px;margin:0 auto;background:#fff;padding:32px;border-radius:12px;">
-  <h2 style="font-family:Georgia,serif;color:${accentColor};margin:0 0 8px;">${daysAway===7?'7-day reminder':'One day to go!'}</h2>
-  <h3 style="font-weight:400;color:#1C1917;margin:0 0 20px;font-size:20px;">${event.name}</h3>
-  <p style="color:#78716C;font-size:14px;margin:0 0 6px;">📅 <strong style="color:#1C1917;">${formatDate(event.date)}</strong>${event.person?' · '+event.person:''}</p>
-  ${event.notes?`<div style="background:#F7F5F0;border-left:3px solid ${accentColor};padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;font-size:13px;color:#78716C;"><strong style="color:#1C1917;">Your notes:</strong><br>${event.notes}</div>`:''}
-  <h4 style="color:${accentColor};margin:24px 0 12px;font-size:15px;">Gift ideas</h4>
-  <ul style="padding-left:20px;color:#1C1917;font-size:14px;line-height:2;">${giftIdeas}</ul>
-  <p style="color:#A8A29E;font-size:11px;margin-top:32px;border-top:1px solid #F0EDE6;padding-top:16px;">Sent by Remindly · your personal event reminder app</p>
-</div>`;
+
+  const message = `${daysAway===7 ? '🗓️ 7-DAY REMINDER' : '⏰ TOMORROW!'}: ${event.name}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📅 Date: ${formatDate(event.date)}${event.person ? '\n👤 For: ' + event.person : ''}
+${event.notes ? '\n📝 Your notes:\n' + event.notes : ''}
+
+🎁 GIFT IDEAS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${giftIdeas}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Sent by Remindly · your personal event reminder app`;
 
   try {
     await emailjs.send(settings.serviceid, settings.templateid, { to_email:settings.email, subject, message });
